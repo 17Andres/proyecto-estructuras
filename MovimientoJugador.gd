@@ -110,9 +110,9 @@ func _mover(delta: float) -> void:
 	var dir: Vector3 = dif / dist
 
 	if dir.length_squared() > 0.001:
-		var target_basis := Basis.looking_at(dir, Vector3.UP)
-		var target_y := target_basis.get_euler().y
-		rotation.y = lerp_angle(rotation.y, target_y, velocidad_rotacion * delta * 60.0)
+		# Calcular el ángulo de rotación usando atan2 para evitar saltos raros
+		var target_angle: float = atan2(dir.x, dir.z)
+		rotation.y = lerp_angle(rotation.y, target_angle, velocidad_rotacion * delta * 60.0)
 
 	velocity = dir * _vel_actual
 	move_and_slide()
