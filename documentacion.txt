@@ -1,0 +1,122 @@
+Documentación del Proyecto Estructuras (versión ampliada)
+
+Introducción: conceptos de búsqueda de caminos
+
+En juegos y simulaciones 3D se usan algoritmos de búsqueda de caminos para mover agentes entre dos puntos evitando obstáculos. Aquí se explican brevemente los mecanismos usados en este proyecto:
+
+- A* (A-Star): Busca el camino de coste mínimo combinando el coste desde el inicio (g) y una heurística estimada al objetivo (h). La función evaluada es f = g + h. Si la heurística es admisible (nunca sobreestima), A* encuentra el camino óptimo. Es eficiente y el algoritmo por defecto cuando se necesita un buen equilibrio entre velocidad y optimalidad.
+
+- Dijkstra: Variante de A* sin heurística (h = 0). Explora los nodos por distancia creciente desde el origen y garantiza el camino más corto. Es más lento que A* cuando hay una heurística informativa.
+
+- DFS (Depth-First Search / Búsqueda en Profundidad): Explora lo más profundo posible antes de retroceder. No garantiza camino más corto ni siempre encuentra una solución en grafos infinitos; aquí se usa como demostración o para exploraciones donde la optimalidad no es requisito.
+
+Notas sobre heurísticas y costes:
+- Para grillas 2D/3D en las que el movimiento entre nodos tiene coste uniforme se usan heurísticas como Manhattan (coste por ejes) o Euclidiana (distancia directa). Elegir la heurística adecuada afecta desempeño y optimalidad.
+- El sistema trata el mundo 3D como una grilla discreta de `Nodo` para simplificar la búsqueda.
+
+Detalles por script
+
+1) `Nodo.gd`
+- Propósito: Representa una celda de la grilla y almacena metadatos necesarios para los algoritmos de búsqueda.
+- Campos principales:
+	- `col`, `fila`: Coordenadas discretas en la grilla.
+	- `world_pos`: Posición Vector3 en el mundo 3D correspondiente al centro de la celda.
+	- `is_obstacle`: Booleano que indica si la celda está bloqueada.
+	- `g_cost`: Coste acumulado desde el nodo inicio (inicialmente INF).
+	- `h_cost`: Heurística (estimación al objetivo).
+	- `f_cost`: `g_cost + h_cost` (actualizado tras cada evaluación).
+	- `parent`: Referencia al `Nodo` previo para reconstruir el camino.
+- Métodos y responsabilidades:
+	- `reset()`: Restablece `g_cost`, `h_cost`, `f_cost` y `parent` antes de una búsqueda.
+	- `calculate_f()`: Actualiza `f_cost` = `g_cost + h_cost`.
+	- `is_walkable()`: Devuelve `not is_obstacle` (útil para filtrar vecinos).
+
+Cómo lo usan los algoritmos:
+- Antes de cada búsqueda, el gestor recorre los `Nodo` y llama a `reset()` para asegurar valores consistentes.
+- Durante A* y Dijkstra, al visitar un vecino se calcula un `tentative_g = current.g_cost + cost(current, vecino)`. Si `tentative_g` es menor que `vecino.g_cost`, se actualiza `vecino.g_cost`, `vecino.parent = current` y se recalcula `vecino.f_cost`.
+
+2) `GestorCuadricula.gd` (antes `GridManager.gd`)
+- Propósito: Construir y mantener la grilla, detectar obstáculos, proveer una API para calcular caminos con distintos algoritmos y devolver una lista ordenada de `Nodo` que forman la ruta.
+- Funciones clave (ejemplos de interfaz pública):
+	- `inicializar_grid(size_x, size_y, cell_size)`: Crea la matriz de `Nodo` y calcula `world_pos` para cada celda.
+	- `detectar_obstaculos()`: Recorre la grilla y usa `RayCast`/probes para marcar `Nodo.is_obstacle`.
+	- `calcular_camino(start_coord, end_coord, algoritmo)`: Calcula y devuelve `Array` de `Nodo` desde `start` a `end`. `algoritmo` puede ser `'A*'`, `'Dijkstra'`, `'DFS'`.
+	- `coord_desde_pos(world_pos)`: Convierte una posición 3D en coordenadas de la grilla.
+
+- Implementación y detalles internos:
+	- Vecindario: Por defecto se consideran 4 vecinos (N, S, E, W); opcionalmente se puede permitir 8-direcciones (diagonales) con coste mayor para diagonales (por ejemplo sqrt(2) * cell_size).
+	- Detección de obstáculos: Para cada `Nodo` se lanza un `RayCast` hacia abajo (o se hace un test de colisión a su `world_pos`) y se marca `is_obstacle` si colisiona con la capa de colisión de muros/obstáculos.
+	- Estructuras: A* y Dijkstra usan una `open_list` priorizada (cola de prioridad basada en `f_cost` o `g_cost`) y una `closed_set` para nodos ya evaluados.
+
+- Diferencias entre A* y Dijkstra:
+	- A*: Calcula `h_cost` (por ejemplo: distancia Manhattan/Euclidiana entre `node.world_pos` y `end.world_pos`). Ordena la `open_list` por `f_cost`.
+	- Dijkstra: Fija `h_cost = 0` para todos los nodos y ordena por `g_cost` puro. El resto del flujo es el mismo.
+
+- DFS en la grilla:
+	- Implementado de forma recursiva o con pila explícita; explora vecinos no visitados hasta encontrar el objetivo. No utiliza costes ni heurísticas.
+
+- Reconstrucción de camino:
+	- Cuando se alcanza el `end`, se reconstruye la ruta siguiendo los `parent` desde el nodo destino hasta el inicio y se invierte la lista.
+
+- Ejemplo de uso (pseudollamada desde otro script):
+	- `var camino = GestorCuadricula.calcular_camino(start_coord, end_coord, "A*")`
+	- `if camino.size() > 0: mover_agente_por_camino(camino)`
+
+3) `InteligenciaEnemigo.gd` (antes `EnemyAI.gd`)
+- Propósito: Controlar la IA de enemigos mediante una máquina de estados y usar la grilla para navegar.
+- Estados comunes:
+	- `IDLE`: Patrulla o espera, puede elegir puntos de interés aleatorios (consultando `GestorCuadricula`).
+	- `CHASE`: Cuando detecta al jugador, solicita una ruta hacia la posición actual del jugador y la sigue.
+	- `ATTACK`: Si está lo bastante cerca ejecuta animaciones de ataque y lógica de daño.
+	- `DEAD`: Reacciona a muerte y limpia recursos.
+
+- Interacción con el Gestor de grilla:
+	- En `CHASE` la IA puede recalcular la ruta cada N segundos o cuando detecta un cambio significativo (p. ej. jugador se aleja o aparece un nuevo obstáculo).
+	- Solicitudes típicas: `var ruta = GestorCuadricula.calcular_camino(mi_coord, player_coord, "A*")`.
+
+4) `MovimientoJugador.gd` (antes `PlayerMovement.gd`)
+- Propósito: Gestionar movimiento del jugador (CharacterBody3D) siguiendo caminos calculados por `GestorCuadricula`.
+- Flujo típico:
+	- El `ManejadorEntrada` obtiene la celda clicada y pide `GestorCuadricula` el camino.
+	- `MovimientoJugador` recibe el `Array` de `Nodo` y lo convierte en una secuencia de `Vector3` (`node.world_pos`).
+	- Movimiento: Interpola la posición del personaje entre nodos con `move_and_slide` o actualizaciones de posición para suavizar y rotar gradualmente hacia el siguiente punto.
+
+- Manejo de interrupciones:
+	- Si el jugador recibe un nuevo clic o una orden de movimiento, se puede cancelar o recalcular la ruta actual.
+
+5) `ManejadorEntrada.gd` (antes `InputHandler.gd`)
+- Propósito: Traducir los clics del ratón en comandos de movimiento y objetos objetivo.
+- Comportamiento:
+	- Lanza un `RayCast` desde la cámara usando la posición del puntero; si golpea el terreno, obtiene `world_pos`.
+	- Convierte `world_pos` a coordenadas de grilla con `GestorCuadricula.coord_desde_pos(world_pos)`.
+	- Llama `GestorCuadricula.calcular_camino(...)` y pasa el resultado a `MovimientoJugador`.
+
+6) `CamaraSeguimiento.gd` (antes `CameraFollow.gd`)
+- Script simple para seguir al jugador con interpolación suave (`lerp`/`linear_interpolate`) y mantener un `offset` fijo.
+
+7) `InterfazUsuario.gd` (antes `HUD.gd`)
+- Maneja barras de salud, indicadores y actualizaciones del HUD.
+- Escucha señales como `player_damaged(damage)` o `player_healed(amount)` provenientes de `MovimientoJugador`.
+
+8) `MenuPrincipal.gd` (antes `MainMenu.gd`)
+- Controla la UI del menú principal y conecta botones para cargar escenas (`Jugar`, `Editor de Niveles`) o salir.
+
+Buenas prácticas y recomendaciones de ajuste
+
+- Frecuencia de recalculo de rutas: Evitar recalcular cada frame. Para IA usa un temporizador (p. ej. 0.5-1s) o recalcula solo al detectar cambios significativos.
+- Tamaño de la grilla: Ajustar `cell_size` según la densidad de obstáculos. Celdas grandes reducen coste de cálculo pero disminuyen precisión.
+- Heurística: Para movimiento ortogonal usar Manhattan, para movimiento libre usar Euclidiana. Asegurar que la heurística sea admisible para mantener optimalidad.
+- Optimización: Usar una `open_list` con cola de prioridad (heap) para mantener rendimiento en mapas grandes. Evitar reasignaciones frecuentes de objetos; reutilizar estructuras cuando sea posible.
+- Dijkstra vs A*: Si no tienes una heurística fiable, usa Dijkstra. Si performance es crítica y puedes definir una heurística admisible, usa A*.
+
+Ejemplo rápido de integración (pseudo-código):
+
+ - Click del jugador -> `ManejadorEntrada` obtiene `world_pos` -> `coord = GestorCuadricula.coord_desde_pos(world_pos)`
+ - `camino = GestorCuadricula.calcular_camino(mi_coord, coord, "A*")`
+ - `MovimientoJugador.set_path(camino)` -> comienza a seguir el camino.
+
+Conclusión
+
+Este documento amplía la descripción funcional de los scripts principales y cómo interactúan con A*, Dijkstra y DFS. Para ajustes finos revisa parámetros en `GestorCuadricula` (tamaño de celda, vecinos permitidos, coste de movimiento diagonal, y la heurística usada) y adapta la frecuencia de recálculo en `InteligenciaEnemigo.gd` según la carga y la sensación de juego deseada.
+
+Archivo: `documentacion.txt` — actualizado con más detalles sobre los scripts y algoritmos.

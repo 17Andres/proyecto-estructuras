@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://5scnvkf6u5hw"]
+
+[ext_resource type="Texture2D" uid="uid://ciuiu1a4ws0ls" path="res://suelo/TIERRA/WhatsApp Image 2026-05-16 at 19.44.45_r2_c1.jpg" id="1_fnxlu"]
+[ext_resource type="Texture2D" uid="uid://djth3p1jcw5in" path="res://suelo/TIERRA/WhatsApp Image 2026-05-16 at 19.44.45_r2_c3.jpg" id="2_tsnyq"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tsnyq"]
+albedo_texture = ExtResource("1_fnxlu")
+uv1_scale = Vector3(1, 20, 1)
+texture_filter = 1
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_3qmus"]
+material = SubResource("StandardMaterial3D_tsnyq")
+size = Vector2(1, 20)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_iyp00"]
+size = Vector3(1, 0.01, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3qmus"]
+albedo_texture = ExtResource("2_tsnyq")
+uv1_scale = Vector3(1, 20, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_iyp00"]
+material = SubResource("StandardMaterial3D_3qmus")
+size = Vector2(1, 20)
+
+[node name="Node3D" type="Node3D" unique_id=1148356332]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=2127371563]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=133365653]
+mesh = SubResource("PlaneMesh_3qmus")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=239720836]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.062072754, 0)
+shape = SubResource("BoxShape3D_iyp00")
+
+[node name="StaticBody3D2" type="StaticBody3D" parent="." unique_id=599946365]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D2" unique_id=72449856]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.062072754, 0)
+shape = SubResource("BoxShape3D_iyp00")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D2" unique_id=891269905]
+mesh = SubResource("PlaneMesh_iyp00")

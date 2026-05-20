@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://cj4262cmgm1qy"]
+
+[ext_resource type="Script" uid="uid://gf5c4h1xgjab" path="res://MenuPrincipal.gd" id="1_06t4h"]
+
+[node name="MainMenu" type="Control" unique_id=899066842]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_06t4h")
+
+[node name="Panel" type="Panel" parent="." unique_id=451176918]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=278386997]
+layout_mode = 0
+offset_left = 403.0
+offset_top = 208.0
+offset_right = 757.0
+offset_bottom = 441.0
+
+[node name="BtnJugar" type="Button" parent="Panel/VBoxContainer" unique_id=1726804981]
+layout_mode = 2
+text = "JUGAR PARTIDA"
+
+[node name="BtnEditor" type="Button" parent="Panel/VBoxContainer" unique_id=1800674102]
+layout_mode = 2
+text = "EDITAR NIVEL"
+
+[node name="BtnSalir" type="Button" parent="Panel/VBoxContainer" unique_id=1034062208]
+layout_mode = 2
+text = "SALIR"

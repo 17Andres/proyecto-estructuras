@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://drsv3v65p2uiv"]
+
+[ext_resource type="Texture2D" uid="uid://bjcxhtyobnsgo" path="res://suelo/imagy-split-image-2026-05-19/WhatsApp Image 2026-05-16 at 19.44.46_r2_c2.jpg" id="1_caogc"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_caogc"]
+albedo_texture = ExtResource("1_caogc")
+uv1_scale = Vector3(100, 100, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_yha64"]
+material = SubResource("StandardMaterial3D_caogc")
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7qlp0"]
+size = Vector3(2, 0.17585449, 2)
+
+[node name="Node3D" type="Node3D" unique_id=728297280]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=2114103870]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1687562576]
+mesh = SubResource("PlaneMesh_yha64")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=2087208771]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.062072754, 0)
+shape = SubResource("BoxShape3D_7qlp0")
