@@ -1,56 +1,33 @@
 
 class_name InteligenciaEnemigo
 extends CharacterBody3D
-
-
-
 @export var grid_manager: GestorCuadricula
-
 @export var jugador: CharacterBody3D
-
 @export var velocidad: float = 4.5
-
 @export var distancia_deteccion: float = 12.0
-
 @export var distancia_ataque: float = 1.5
-
 @export var intervalo_recalculo: float = 0.5
-
 @export_range(0.01, 1.0, 0.01) var velocidad_rotacion: float = 0.15
-
 @export var anim_caminar: String = "Medium Run/mixamo_com"
 @export var anim_atacar:  String = "Mutant Punch/mixamo_com"
 @export var anim_morir:   String = "Death/mixamo_com"
 @export var anim_idle:    String = "T-Pose/mixamo_com"
-
+@export var anim_baile:   String = "bailecito"
 @export_group("Combate y Vida")
 @export var vida_max: float = 100.0
 @export var danio_ataque: float = 15.0
 @export var intervalo_ataque: float = 2.0
 
-
-
-enum Estado { PATRULLANDO, PERSIGUIENDO, ATACANDO, MUERTO }
-
+enum Estado { PATRULLANDO, PERSIGUIENDO, ATACANDO, MUERTO, CELEBRANDO }
 var estado: Estado = Estado.PATRULLANDO
-
 var _camino: Array = []
-
 var _timer_recalculo: float = 0.0
-
 var _timer_ataque: float = 0.0
-
 var vida_actual: float = 100.0
-
 var _progress_bar: ProgressBar
-
 var _anim: AnimationPlayer = null
-
 var _ultima_anim: String = ""
-
 var _nombre: String = "Enemigo"
-
-
 
 func _ready() -> void:
 	_nombre = name
@@ -65,6 +42,8 @@ func _ready() -> void:
 	else:
 		if _anim.has_animation(anim_idle):
 			_anim.get_animation(anim_idle).loop_mode = Animation.LOOP_LINEAR
+		if _anim.has_animation(anim_baile):
+			_anim.get_animation(anim_baile).loop_mode = Animation.LOOP_LINEAR
 		if _anim.has_animation(anim_caminar):
 			_anim.get_animation(anim_caminar).loop_mode = Animation.LOOP_LINEAR
 		if _anim.has_animation(anim_atacar):
@@ -72,9 +51,8 @@ func _ready() -> void:
 
 	_reproducir(anim_idle)
 
-
 func _physics_process(delta: float) -> void:
-	if estado == Estado.MUERTO:
+	if estado == Estado.MUERTO or estado == Estado.CELEBRANDO:
 		return
 
 	if jugador == null or grid_manager == null:
@@ -87,8 +65,6 @@ func _physics_process(delta: float) -> void:
 			_logica_persecucion(delta, dist)
 		Estado.ATACANDO:
 			_logica_ataque(delta, dist)
-
-
 
 func _logica_persecucion(delta: float, dist: float) -> void:
 	if dist > distancia_deteccion:
@@ -119,16 +95,14 @@ func _logica_persecucion(delta: float, dist: float) -> void:
 
 	_mover_hacia_waypoint(delta)
 
-
 func _recalcular_camino(dist: float) -> void:
-	var nuevo_camino: Array = grid_manager.astar(global_position, jugador.global_position)
+	var nuevo_camino: Array = grid_manager.a_estrella(global_position, jugador.global_position)
 	if not nuevo_camino.is_empty():
 		_camino = nuevo_camino
 		estado = Estado.PERSIGUIENDO
 		_reproducir(anim_caminar)
 	else:
 		_camino.clear()
-
 
 func _mover_hacia_waypoint(delta: float) -> void:
 	var destino: Vector3 = _camino[0]
@@ -149,8 +123,6 @@ func _mover_hacia_waypoint(delta: float) -> void:
 
 	velocity = dir * velocidad
 	move_and_slide()
-
-
 
 func _logica_ataque(delta: float, dist: float) -> void:
 	if dist > distancia_ataque + 0.5:
@@ -176,8 +148,6 @@ func _logica_ataque(delta: float, dist: float) -> void:
 		if jugador.has_method("recibir_danio"):
 			jugador.recibir_danio(danio_ataque)
 
-
-
 func recibir_danio(cantidad: float) -> void:
 	if estado == Estado.MUERTO:
 		return
@@ -201,7 +171,14 @@ func morir() -> void:
 		await _anim.animation_finished
 	queue_free()
 
-
+func celebrar_victoria() -> void:
+	if estado == Estado.MUERTO:
+		return
+	estado = Estado.CELEBRANDO
+	_camino.clear()
+	velocity = Vector3.ZERO
+	move_and_slide()
+	_reproducir(anim_baile)
 
 func _buscar_animation_player(nodo: Node) -> AnimationPlayer:
 	for hijo in nodo.get_children():
@@ -211,7 +188,6 @@ func _buscar_animation_player(nodo: Node) -> AnimationPlayer:
 		if resultado != null:
 			return resultado
 	return null
-
 
 func _reproducir(nombre: String) -> void:
 	if _anim == null:

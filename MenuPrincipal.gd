@@ -1,9 +1,6 @@
 extends Control
-
 @export_file("*.tscn") var escena_juego: String = "res://mundo.tscn"
-
 @export_file("*.tscn") var escena_editor: String = "res://editor.tscn"
-
 @onready var btn_jugar: Button = $Panel/VBoxContainer/BtnJugar
 @onready var btn_editor: Button = $Panel/VBoxContainer/BtnEditor
 @onready var btn_salir: Button = $Panel/VBoxContainer/BtnSalir

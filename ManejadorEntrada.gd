@@ -2,28 +2,18 @@
 class_name ManejadorEntrada
 extends Node3D
 
-
-
 @export var camara: Camera3D
-
 @export var grid_manager: GestorCuadricula
-
 @export var jugador: MovimientoJugador
-
 @export_flags_3d_physics var mascara_suelo: int = 1
-
 @export var distancia_rayo: float = 1000.0
-
 @export_enum("astar", "dijkstra", "dfs") var algoritmo: String = "astar"
-
-
 
 func _ready() -> void:
 	if camara == null:
 		camara = get_viewport().get_camera_3d()
 		if camara == null:
 			push_error("[ManejadorEntrada] No se encontró una Camera3D en el viewport.")
-
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -33,8 +23,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif clic.button_index == MOUSE_BUTTON_RIGHT and clic.pressed:
 			if jugador.has_method("atacar"):
 				jugador.atacar()
-
-
 
 func _procesar_clic(pos_pantalla: Vector2) -> void:
 	if camara == null or grid_manager == null or jugador == null:
@@ -79,7 +67,7 @@ func _procesar_clic(pos_pantalla: Vector2) -> void:
 
 	match algoritmo:
 		"astar":
-			camino = grid_manager.astar(pos_mago, punto_suelo)
+			camino = grid_manager.a_estrella(pos_mago, punto_suelo)
 		"dijkstra":
 			camino = grid_manager.dijkstra(pos_mago, punto_suelo)
 		"dfs":
@@ -91,4 +79,4 @@ func _procesar_clic(pos_pantalla: Vector2) -> void:
 	if camino.is_empty():
 		print("[ManejadorEntrada] No se encontró camino hacia el destino.")
 	else:
-		jugador.set_camino(camino)
+		jugador.establecer_camino(camino)

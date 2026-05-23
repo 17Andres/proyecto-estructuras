@@ -1,60 +1,45 @@
 
 class_name MovimientoJugador
 extends CharacterBody3D
-
-
-
 @export var animation_player: AnimationPlayer
-
 @export var anim_caminar: String = "Walking/mixamo_com"
-
 @export var anim_idle: String = "T-Pose/mixamo_com"
-
 @export var anim_morir: String = "Death/mixamo_com"
-
 @export var anim_atacar: String = "Mutant Punch/mixamo_com"
-
 @export var velocidad_max: float = 6.0
-
 @export_range(0.01, 1.0, 0.01) var aceleracion: float = 0.12
-
 @export_range(0.01, 1.0, 0.01) var desaceleracion: float = 0.18
-
 @export_range(0.01, 1.0, 0.01) var velocidad_rotacion: float = 0.12
-
 @export var blend_animacion: float = 0.2
-
 @export var vida_max: float = 100.0
-
 @export_group("Combate")
 @export var danio_ataque: float = 35.0
 @export var rango_ataque: float = 2.5
 @export var intervalo_ataque: float = 1.0
-
+@export var velocidad_anim_ataque: float = 2.0
 @export var InterfazUsuario: Node
 
-
-
+const CAPA_SUELO: int = 1
+const CAPA_OBSTACULOS: int = 4
 const ARRIVAL_DIST:    float = 0.2
 const VELOCIDAD_MIN:   float = 0.05
-
-
-
 enum Estado { IDLE, MOVIENDOSE, FRENANDO, MUERTO, ATACANDO }
 var estado: Estado = Estado.IDLE
-
-
-
 var camino_actual:     Array    = []
 var _vel_actual:       float    = 0.0
 var _ultima_anim:      String   = ""
 var vida_actual:       float    = 200.0
 var _timer_ataque:     float    = 0.0
 
-
-
 func _ready() -> void:
+	collision_mask |= CAPA_SUELO | CAPA_OBSTACULOS
+
+	print("[DEBUG] Rotación inicial Y en radianes: ",rotation.y)
+	print("[DEBUG] Rotación inicial Y en grados: ",rad_to_deg(rotation.y))
 	vida_actual = vida_max
+	
+	if InterfazUsuario == null:
+		InterfazUsuario = get_node_or_null("../HUD")
 	
 	if animation_player != null:
 		if animation_player.has_animation(anim_caminar):
@@ -63,10 +48,10 @@ func _ready() -> void:
 			animation_player.get_animation(anim_idle).loop_mode = Animation.LOOP_LINEAR
 		if animation_player.has_animation(anim_atacar):
 			animation_player.get_animation(anim_atacar).loop_mode = Animation.LOOP_LINEAR
-
+  
 	_transicionar(Estado.IDLE)
 	_actualizar_hud()
-
+	
 
 func _physics_process(delta: float) -> void:
 	if estado == Estado.MUERTO:
@@ -74,6 +59,39 @@ func _physics_process(delta: float) -> void:
 		
 	if _timer_ataque > 0.0:
 		_timer_ataque -= delta
+
+	# === Lógica de Movimiento WASD ===
+	var input_dir = Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_action_pressed("ui_up"): input_dir.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_action_pressed("ui_down"): input_dir.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_action_pressed("ui_left"): input_dir.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_action_pressed("ui_right"): input_dir.x += 1
+	input_dir = input_dir.normalized()
+
+	if input_dir.length_squared() > 0 and estado != Estado.ATACANDO:
+		camino_actual.clear() # Cancela el camino de A* (clic)
+		_transicionar(Estado.MOVIENDOSE)
+		
+		var dir = Vector3(input_dir.x, 0, input_dir.y)
+		_vel_actual = lerp(_vel_actual, velocidad_max, aceleracion * delta * 60.0)
+		
+		var target_angle = atan2(dir.x, dir.z)
+		var correccion_inicial = PI
+		var corrected_target = target_angle + correccion_inicial
+		var current_angle = rotation.y
+		var angle_diff = fmod(corrected_target - current_angle + PI, TAU) - PI
+		
+		if abs(angle_diff) < 0.05:
+			rotation.y = corrected_target
+		else:
+			rotation.y = lerp_angle(current_angle, corrected_target, velocidad_rotacion * delta * 60.0)
+			
+		velocity = dir * _vel_actual
+		move_and_slide()
+		return
+	elif camino_actual.is_empty() and estado == Estado.MOVIENDOSE:
+		_transicionar(Estado.FRENANDO)
+	# =================================
 
 	match estado:
 		Estado.IDLE:
@@ -86,8 +104,6 @@ func _physics_process(delta: float) -> void:
 		Estado.ATACANDO:
 			velocity = Vector3.ZERO
 			move_and_slide()
-
-
 
 func _mover(delta: float) -> void:
 	if camino_actual.is_empty():
@@ -104,19 +120,23 @@ func _mover(delta: float) -> void:
 		if camino_actual.is_empty():
 			_transicionar(Estado.FRENANDO)
 		return
-
 	_vel_actual = lerp(_vel_actual, velocidad_max, aceleracion * delta * 60.0)
 
 	var dir: Vector3 = dif / dist
-
+	
 	if dir.length_squared() > 0.001:
-		# Calcular el ángulo de rotación usando atan2 para evitar saltos raros
 		var target_angle: float = atan2(dir.x, dir.z)
-		rotation.y = lerp_angle(rotation.y, target_angle, velocidad_rotacion * delta * 60.0)
-
+		var correccion_inicial: float = PI
+		var corrected_target: float = target_angle + correccion_inicial
+		var current_angle: float = rotation.y
+		var angle_diff: float = fmod(corrected_target - current_angle + PI, TAU) - PI
+		if abs(angle_diff) < 0.05:
+			rotation.y = corrected_target
+		else:
+			rotation.y = lerp_angle(current_angle, corrected_target,velocidad_rotacion * delta * 60.0)
+	
 	velocity = dir * _vel_actual
 	move_and_slide()
-
 
 func _frenar(delta: float) -> void:
 	_vel_actual = lerp(_vel_actual, 0.0, desaceleracion * delta * 60.0)
@@ -129,8 +149,6 @@ func _frenar(delta: float) -> void:
 		move_and_slide()
 		_transicionar(Estado.IDLE)
 
-
-
 func recibir_danio(cantidad: float) -> void:
 	if estado == Estado.MUERTO:
 		return
@@ -141,27 +159,27 @@ func recibir_danio(cantidad: float) -> void:
 	if vida_actual <= 0.0:
 		_morir()
 
-
 func _morir() -> void:
 	_transicionar(Estado.MUERTO)
 	velocity = Vector3.ZERO
 	_reproducir(anim_morir)
 	print("[MovimientoJugador] El jugador murió.")
-
+	
+	if InterfazUsuario != null and InterfazUsuario.has_method("mostrar_derrota"):
+		InterfazUsuario.mostrar_derrota()
+		
+	get_tree().call_group("enemigos", "celebrar_victoria")
 
 func _actualizar_hud() -> void:
 	if InterfazUsuario != null:
 		InterfazUsuario.call("actualizar_vida", vida_actual, vida_max)
 
-
-
-func set_camino(nuevo_camino: Array) -> void:
+func establecer_camino(nuevo_camino: Array) -> void:
 	if nuevo_camino.is_empty():
 		return
 	camino_actual = nuevo_camino
 	_transicionar(Estado.MOVIENDOSE)
 	print("[MovimientoJugador] Camino nuevo: %d waypoints." % camino_actual.size())
-
 
 func detener() -> void:
 	camino_actual.clear()
@@ -202,8 +220,6 @@ func atacar() -> void:
 	if estado == Estado.ATACANDO:
 		_transicionar(Estado.IDLE)
 
-
-
 func _transicionar(nuevo: Estado) -> void:
 	if estado == nuevo:
 		return
@@ -220,7 +236,6 @@ func _transicionar(nuevo: Estado) -> void:
 		Estado.ATACANDO:
 			_reproducir(anim_atacar)
 
-
 func _reproducir(nombre: String) -> void:
 	if animation_player == null:
 		return
@@ -229,5 +244,6 @@ func _reproducir(nombre: String) -> void:
 	if not animation_player.has_animation(nombre):
 		push_warning("[MovimientoJugador] Animación no encontrada: '%s'" % nombre)
 		return
-	animation_player.play(nombre, blend_animacion)
+	var velocidad_animacion := velocidad_anim_ataque if nombre == anim_atacar else 1.0
+	animation_player.play(nombre, blend_animacion, velocidad_animacion)
 	_ultima_anim = nombre

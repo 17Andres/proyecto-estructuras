@@ -1,35 +1,19 @@
 
 class_name GestorCuadricula
 extends Node3D
-
-
-
 @export var ancho: int = 100
-
 @export var alto: int = 100
-
 @export var tamano_celda: float = 2.0
-
 @export var origen_mapa: Vector3 = Vector3.ZERO
-
 @export var altura_raycast: float = 10.0
-
 @export_flags_3d_physics var mascara_obstaculos: int = 1
-
-
-
 var grilla: Dictionary = {}
-
 const TOLERANCIA_LLEGADA: float = 0.2
-
-
 
 func _ready() -> void:
 	generar_mapa()
 	await get_tree().physics_frame
 	inicializar_grilla()
-
-
 
 func generar_mapa() -> void:
 	grilla.clear()
@@ -47,8 +31,6 @@ func generar_mapa() -> void:
 			grilla[coord] = Nodo.new(coord, pos, false)
 
 	print("[GestorCuadricula] Mapa generado: %d x %d = %d nodos" % [ancho, alto, grilla.size()])
-
-
 
 func inicializar_grilla() -> void:
 	var espacio: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
@@ -79,11 +61,9 @@ func inicializar_grilla() -> void:
 
 	print("[GestorCuadricula] Obstáculos detectados: %d" % obstaculos_encontrados)
 
-
 func marcar_obstaculo(coord: Vector2i) -> void:
 	if grilla.has(coord):
 		grilla[coord].es_obstaculo = true
-
 
 func mundo_a_grilla(pos: Vector3) -> Nodo:
 	var col := int((pos.x - origen_mapa.x) / tamano_celda)
@@ -91,15 +71,13 @@ func mundo_a_grilla(pos: Vector3) -> Nodo:
 	var coord := Vector2i(col, fila)
 	return grilla.get(coord, null)
 
-
-
 func obtener_vecinos(nodo: Nodo) -> Array:
 	var vecinos: Array = []
 
 	var direcciones := [
+		Vector2i( 0, 1),   
 		Vector2i( 0, -1),   
-		Vector2i( 0,  1),   
-		Vector2i( 1,  0),   
+		Vector2i( 1, 0),   
 		Vector2i(-1,  0),   
 		Vector2i( 1, -1),   
 		Vector2i(-1, -1),   
@@ -122,13 +100,10 @@ func obtener_vecinos(nodo: Nodo) -> Array:
 
 	return vecinos
 
-
-
 func _heuristica(a: Nodo, b: Nodo) -> float:
 	var dx := float(abs(a.coordenada.x - b.coordenada.x))
 	var dz := float(abs(a.coordenada.y - b.coordenada.y))
 	return sqrt(dx * dx + dz * dz)
-
 
 func _insertar_ordenado(lista: Array, nodo: Nodo) -> void:
 	var i := 0
@@ -136,8 +111,7 @@ func _insertar_ordenado(lista: Array, nodo: Nodo) -> void:
 		i += 1
 	lista.insert(i, nodo)
 
-
-func astar(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
+func a_estrella(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 	var nodo_inicio: Nodo = mundo_a_grilla(inicio_pos)
 	var nodo_fin:    Nodo = mundo_a_grilla(fin_pos)
 
@@ -153,15 +127,11 @@ func astar(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 
 	nodo_inicio.g_cost = 0.0
 	nodo_inicio.h_cost = _heuristica(nodo_inicio, nodo_fin)
-
 	var open_set: Array = []
 	_insertar_ordenado(open_set, nodo_inicio)
-
 	var closed_set: Dictionary = {}
-
 	var iteraciones := 0
 	var MAX_ITERACIONES := 1000
-
 	while open_set.size() > 0:
 		iteraciones += 1
 		if iteraciones > MAX_ITERACIONES:
@@ -169,9 +139,7 @@ func astar(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 			return []
 
 		var actual: Nodo = open_set.pop_front()
-
 		closed_set[actual.coordenada] = true
-
 		if actual.coordenada == nodo_fin.coordenada:
 			return _reconstruir_camino(nodo_fin)
 
@@ -199,7 +167,6 @@ func astar(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 	push_warning("[A*] No se encontró camino.")
 	return []
 
-
 func _reconstruir_camino(nodo_fin: Nodo) -> Array[Vector3]:
 	var camino: Array[Vector3] = []
 	var actual: Nodo = nodo_fin
@@ -210,8 +177,6 @@ func _reconstruir_camino(nodo_fin: Nodo) -> Array[Vector3]:
 
 	print("[A*] Camino encontrado: %d pasos." % camino.size())
 	return camino
-
-
 
 func dijkstra(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 	var nodo_inicio: Nodo = mundo_a_grilla(inicio_pos)
@@ -274,8 +239,6 @@ func dijkstra(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 	push_warning("[Dijkstra] No se encontró camino.")
 	return []
 
-
-
 func dfs_es_alcanzable(inicio_pos: Vector3, fin_pos: Vector3) -> bool:
 	var nodo_inicio: Nodo = mundo_a_grilla(inicio_pos)
 	var nodo_fin:    Nodo = mundo_a_grilla(fin_pos)
@@ -307,7 +270,6 @@ func dfs_es_alcanzable(inicio_pos: Vector3, fin_pos: Vector3) -> bool:
 	print("[DFS] Destino NO alcanzable.")
 	return false
 
-
 func dfs_camino(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 	var nodo_inicio: Nodo = mundo_a_grilla(inicio_pos)
 	var nodo_fin:    Nodo = mundo_a_grilla(fin_pos)
@@ -337,12 +299,6 @@ func dfs_camino(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]:
 				pila.append(vecino)            
 
 	return []  
-
-
-
-
-
-
 
 func debug_imprimir_mapa() -> void:
 	print("=== MAPA DE GRILLA (%d x %d) ===" % [ancho, alto])
