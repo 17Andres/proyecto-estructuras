@@ -1,122 +1,680 @@
-Documentación del Proyecto Estructuras (versión ampliada)
+Documentación técnica del Proyecto Estructuras
+=============================================
 
-Introducción: conceptos de búsqueda de caminos
+Versión actual del proyecto:
+Juego 3D educativo en Godot 4 para explicar estructuras de datos, algoritmos de búsqueda de caminos, movimiento de personajes, IA enemiga, combate básico e interfaz de usuario.
 
-En juegos y simulaciones 3D se usan algoritmos de búsqueda de caminos para mover agentes entre dos puntos evitando obstáculos. Aquí se explican brevemente los mecanismos usados en este proyecto:
 
-- A* (A-Star): Busca el camino de coste mínimo combinando el coste desde el inicio (g) y una heurística estimada al objetivo (h). La función evaluada es f = g + h. Si la heurística es admisible (nunca sobreestima), A* encuentra el camino óptimo. Es eficiente y el algoritmo por defecto cuando se necesita un buen equilibrio entre velocidad y optimalidad.
+1. Resumen general
+------------------
 
-- Dijkstra: Variante de A* sin heurística (h = 0). Explora los nodos por distancia creciente desde el origen y garantiza el camino más corto. Es más lento que A* cuando hay una heurística informativa.
+El proyecto está construido alrededor de una escena principal, `mundo.tscn`, donde conviven:
 
-- DFS (Depth-First Search / Búsqueda en Profundidad): Explora lo más profundo posible antes de retroceder. No garantiza camino más corto ni siempre encuentra una solución en grafos infinitos; aquí se usa como demostración o para exploraciones donde la optimalidad no es requisito.
+- un jugador controlado por teclado o por clic;
+- enemigos con IA de persecución y ataque;
+- una grilla de navegación que representa el mundo como celdas;
+- algoritmos A*, Dijkstra y DFS;
+- sistema de vida, daño, muerte y derrota;
+- HUD con barra de vida;
+- cámara de seguimiento;
+- menú principal.
 
-Notas sobre heurísticas y costes:
-- Para grillas 2D/3D en las que el movimiento entre nodos tiene coste uniforme se usan heurísticas como Manhattan (coste por ejes) o Euclidiana (distancia directa). Elegir la heurística adecuada afecta desempeño y optimalidad.
-- El sistema trata el mundo 3D como una grilla discreta de `Nodo` para simplificar la búsqueda.
+La idea educativa principal es mostrar cómo un mundo 3D puede convertirse en una estructura discreta de nodos para aplicar algoritmos clásicos de búsqueda de caminos.
 
-Detalles por script
 
-1) `Nodo.gd`
-- Propósito: Representa una celda de la grilla y almacena metadatos necesarios para los algoritmos de búsqueda.
-- Campos principales:
-	- `col`, `fila`: Coordenadas discretas en la grilla.
-	- `world_pos`: Posición Vector3 en el mundo 3D correspondiente al centro de la celda.
-	- `is_obstacle`: Booleano que indica si la celda está bloqueada.
-	- `g_cost`: Coste acumulado desde el nodo inicio (inicialmente INF).
-	- `h_cost`: Heurística (estimación al objetivo).
-	- `f_cost`: `g_cost + h_cost` (actualizado tras cada evaluación).
-	- `parent`: Referencia al `Nodo` previo para reconstruir el camino.
-- Métodos y responsabilidades:
-	- `reset()`: Restablece `g_cost`, `h_cost`, `f_cost` y `parent` antes de una búsqueda.
-	- `calculate_f()`: Actualiza `f_cost` = `g_cost + h_cost`.
-	- `is_walkable()`: Devuelve `not is_obstacle` (útil para filtrar vecinos).
+2. Archivos principales
+-----------------------
 
-Cómo lo usan los algoritmos:
-- Antes de cada búsqueda, el gestor recorre los `Nodo` y llama a `reset()` para asegurar valores consistentes.
-- Durante A* y Dijkstra, al visitar un vecino se calcula un `tentative_g = current.g_cost + cost(current, vecino)`. Si `tentative_g` es menor que `vecino.g_cost`, se actualiza `vecino.g_cost`, `vecino.parent = current` y se recalcula `vecino.f_cost`.
+Escenas:
 
-2) `GestorCuadricula.gd` (antes `GridManager.gd`)
-- Propósito: Construir y mantener la grilla, detectar obstáculos, proveer una API para calcular caminos con distintos algoritmos y devolver una lista ordenada de `Nodo` que forman la ruta.
-- Funciones clave (ejemplos de interfaz pública):
-	- `inicializar_grid(size_x, size_y, cell_size)`: Crea la matriz de `Nodo` y calcula `world_pos` para cada celda.
-	- `detectar_obstaculos()`: Recorre la grilla y usa `RayCast`/probes para marcar `Nodo.is_obstacle`.
-	- `calcular_camino(start_coord, end_coord, algoritmo)`: Calcula y devuelve `Array` de `Nodo` desde `start` a `end`. `algoritmo` puede ser `'A*'`, `'Dijkstra'`, `'DFS'`.
-	- `coord_desde_pos(world_pos)`: Convierte una posición 3D en coordenadas de la grilla.
+- `mundo.tscn`: escena principal del juego.
+- `main_menu.tscn`: menú principal.
+- `main_player.tscn`: escena del jugador.
+- `EnemyUnit.tscn`: escena base del enemigo.
+- `suelo/suelo.tscn`, `suelo/pasto.tscn`, `suelo/tierra.tscn`: escenas relacionadas con el terreno.
 
-- Implementación y detalles internos:
-	- Vecindario: Por defecto se consideran 4 vecinos (N, S, E, W); opcionalmente se puede permitir 8-direcciones (diagonales) con coste mayor para diagonales (por ejemplo sqrt(2) * cell_size).
-	- Detección de obstáculos: Para cada `Nodo` se lanza un `RayCast` hacia abajo (o se hace un test de colisión a su `world_pos`) y se marca `is_obstacle` si colisiona con la capa de colisión de muros/obstáculos.
-	- Estructuras: A* y Dijkstra usan una `open_list` priorizada (cola de prioridad basada en `f_cost` o `g_cost`) y una `closed_set` para nodos ya evaluados.
+Scripts:
 
-- Diferencias entre A* y Dijkstra:
-	- A*: Calcula `h_cost` (por ejemplo: distancia Manhattan/Euclidiana entre `node.world_pos` y `end.world_pos`). Ordena la `open_list` por `f_cost`.
-	- Dijkstra: Fija `h_cost = 0` para todos los nodos y ordena por `g_cost` puro. El resto del flujo es el mismo.
+- `GestorCuadricula.gd`: crea la grilla y ejecuta A*, Dijkstra y DFS.
+- `Nodo.gd`: representa cada celda de la grilla.
+- `MovimientoJugador.gd`: controla movimiento, vida, ataque y animaciones del jugador.
+- `ManejadorEntrada.gd`: convierte clics del mouse en rutas de movimiento.
+- `InteligenciaEnemigo.gd`: controla IA, persecución, ataque, vida y muerte de enemigos.
+- `InterfazUsuario.gd`: actualiza HUD y muestra derrota.
+- `MenuPrincipal.gd`: controla botones del menú.
+- `CamaraSeguimiento.gd`: mueve la cámara siguiendo al jugador.
 
-- DFS en la grilla:
-	- Implementado de forma recursiva o con pila explícita; explora vecinos no visitados hasta encontrar el objetivo. No utiliza costes ni heurísticas.
+Assets:
 
-- Reconstrucción de camino:
-	- Cuando se alcanza el `end`, se reconstruye la ruta siguiendo los `parent` desde el nodo destino hasta el inicio y se invierte la lista.
+- `heroe/`: modelo y animaciones del jugador.
+- `enemigo/`: modelo y animaciones de enemigos.
+- `KayKit_Forest_Nature_Pack_1.0_FREE/`: assets de naturaleza.
+- `modular_terrain_collections/`: terrenos modulares.
 
-- Ejemplo de uso (pseudollamada desde otro script):
-	- `var camino = GestorCuadricula.calcular_camino(start_coord, end_coord, "A*")`
-	- `if camino.size() > 0: mover_agente_por_camino(camino)`
 
-3) `InteligenciaEnemigo.gd` (antes `EnemyAI.gd`)
-- Propósito: Controlar la IA de enemigos mediante una máquina de estados y usar la grilla para navegar.
-- Estados comunes:
-	- `IDLE`: Patrulla o espera, puede elegir puntos de interés aleatorios (consultando `GestorCuadricula`).
-	- `CHASE`: Cuando detecta al jugador, solicita una ruta hacia la posición actual del jugador y la sigue.
-	- `ATTACK`: Si está lo bastante cerca ejecuta animaciones de ataque y lógica de daño.
-	- `DEAD`: Reacciona a muerte y limpia recursos.
+3. Flujo general del juego
+--------------------------
 
-- Interacción con el Gestor de grilla:
-	- En `CHASE` la IA puede recalcular la ruta cada N segundos o cuando detecta un cambio significativo (p. ej. jugador se aleja o aparece un nuevo obstáculo).
-	- Solicitudes típicas: `var ruta = GestorCuadricula.calcular_camino(mi_coord, player_coord, "A*")`.
+1. El proyecto abre desde la escena configurada en `project.godot`.
+2. El menú principal permite iniciar la partida cargando `mundo.tscn`.
+3. En la escena principal, el jugador puede moverse:
+   - con `W`, `A`, `S`, `D`;
+   - con flechas;
+   - con clic izquierdo sobre el suelo.
+4. Si el jugador hace clic en el suelo:
+   - `ManejadorEntrada.gd` lanza un raycast desde la cámara;
+   - valida el punto golpeado;
+   - pide una ruta al `GestorCuadricula`;
+   - envía esa ruta a `MovimientoJugador.gd`.
+5. Los enemigos detectan al jugador si entra en su rango de detección.
+6. Los enemigos recalculan rutas con A* y persiguen al jugador.
+7. Si un enemigo entra en rango de ataque, causa daño al jugador.
+8. El jugador puede atacar con clic derecho a enemigos cercanos.
+9. Si el jugador muere, se muestra la pantalla de derrota y los enemigos celebran.
 
-4) `MovimientoJugador.gd` (antes `PlayerMovement.gd`)
-- Propósito: Gestionar movimiento del jugador (CharacterBody3D) siguiendo caminos calculados por `GestorCuadricula`.
-- Flujo típico:
-	- El `ManejadorEntrada` obtiene la celda clicada y pide `GestorCuadricula` el camino.
-	- `MovimientoJugador` recibe el `Array` de `Nodo` y lo convierte en una secuencia de `Vector3` (`node.world_pos`).
-	- Movimiento: Interpola la posición del personaje entre nodos con `move_and_slide` o actualizaciones de posición para suavizar y rotar gradualmente hacia el siguiente punto.
 
-- Manejo de interrupciones:
-	- Si el jugador recibe un nuevo clic o una orden de movimiento, se puede cancelar o recalcular la ruta actual.
+4. Capas de física
+------------------
 
-5) `ManejadorEntrada.gd` (antes `InputHandler.gd`)
-- Propósito: Traducir los clics del ratón en comandos de movimiento y objetos objetivo.
-- Comportamiento:
-	- Lanza un `RayCast` desde la cámara usando la posición del puntero; si golpea el terreno, obtiene `world_pos`.
-	- Convierte `world_pos` a coordenadas de grilla con `GestorCuadricula.coord_desde_pos(world_pos)`.
-	- Llama `GestorCuadricula.calcular_camino(...)` y pasa el resultado a `MovimientoJugador`.
+El archivo `project.godot` define estas capas 3D:
 
-6) `CamaraSeguimiento.gd` (antes `CameraFollow.gd`)
-- Script simple para seguir al jugador con interpolación suave (`lerp`/`linear_interpolate`) y mantener un `offset` fijo.
+- capa 1: `suelo`;
+- capa 2: `jugador`;
+- capa 3: `obstaculos`.
 
-7) `InterfazUsuario.gd` (antes `HUD.gd`)
-- Maneja barras de salud, indicadores y actualizaciones del HUD.
-- Escucha señales como `player_damaged(damage)` o `player_healed(amount)` provenientes de `MovimientoJugador`.
+Estas capas son importantes porque los raycasts y las colisiones dependen de ellas.
 
-8) `MenuPrincipal.gd` (antes `MainMenu.gd`)
-- Controla la UI del menú principal y conecta botones para cargar escenas (`Jugar`, `Editor de Niveles`) o salir.
+Usos principales:
 
-Buenas prácticas y recomendaciones de ajuste
+- `ManejadorEntrada.gd` usa `mascara_suelo` para detectar clics sobre el suelo.
+- `GestorCuadricula.gd` usa `mascara_obstaculos` para marcar celdas bloqueadas.
+- `MovimientoJugador.gd` ajusta su `collision_mask` para interactuar con suelo y obstáculos.
 
-- Frecuencia de recalculo de rutas: Evitar recalcular cada frame. Para IA usa un temporizador (p. ej. 0.5-1s) o recalcula solo al detectar cambios significativos.
-- Tamaño de la grilla: Ajustar `cell_size` según la densidad de obstáculos. Celdas grandes reducen coste de cálculo pero disminuyen precisión.
-- Heurística: Para movimiento ortogonal usar Manhattan, para movimiento libre usar Euclidiana. Asegurar que la heurística sea admisible para mantener optimalidad.
-- Optimización: Usar una `open_list` con cola de prioridad (heap) para mantener rendimiento en mapas grandes. Evitar reasignaciones frecuentes de objetos; reutilizar estructuras cuando sea posible.
-- Dijkstra vs A*: Si no tienes una heurística fiable, usa Dijkstra. Si performance es crítica y puedes definir una heurística admisible, usa A*.
 
-Ejemplo rápido de integración (pseudo-código):
+5. `Nodo.gd`
+------------
 
- - Click del jugador -> `ManejadorEntrada` obtiene `world_pos` -> `coord = GestorCuadricula.coord_desde_pos(world_pos)`
- - `camino = GestorCuadricula.calcular_camino(mi_coord, coord, "A*")`
- - `MovimientoJugador.set_path(camino)` -> comienza a seguir el camino.
+Propósito:
+Representa una celda de la grilla de navegación.
 
-Conclusión
+Clase:
 
-Este documento amplía la descripción funcional de los scripts principales y cómo interactúan con A*, Dijkstra y DFS. Para ajustes finos revisa parámetros en `GestorCuadricula` (tamaño de celda, vecinos permitidos, coste de movimiento diagonal, y la heurística usada) y adapta la frecuencia de recálculo en `InteligenciaEnemigo.gd` según la carga y la sensación de juego deseada.
+- `class_name Nodo`
+- hereda de `RefCounted`.
 
-Archivo: `documentacion.txt` — actualizado con más detalles sobre los scripts y algoritmos.
+Variables principales:
+
+- `coordenada: Vector2i`
+  Coordenada discreta dentro de la grilla.
+
+- `posicion_mundo: Vector3`
+  Posición 3D correspondiente al centro de esa celda.
+
+- `es_obstaculo: bool`
+  Indica si la celda está bloqueada.
+
+- `g_cost: float`
+  Costo acumulado desde el nodo inicial.
+
+- `h_cost: float`
+  Heurística estimada hacia el objetivo.
+
+- `f_cost: float`
+  Propiedad calculada como `g_cost + h_cost`.
+
+- `padre: Nodo`
+  Nodo anterior usado para reconstruir el camino.
+
+Métodos:
+
+- `_init(coord, pos, obst)`
+  Inicializa coordenada, posición de mundo y estado de obstáculo.
+
+- `resetear()`
+  Reinicia costos y padre antes de cada búsqueda.
+
+- `_to_string()`
+  Devuelve una representación textual útil para depuración.
+
+Relación con los algoritmos:
+Cada algoritmo modifica `g_cost`, `h_cost` y `padre`. Cuando se llega al destino, el camino se reconstruye siguiendo `padre` desde el nodo final hasta el nodo inicial.
+
+
+6. `GestorCuadricula.gd`
+------------------------
+
+Propósito:
+Crear una grilla navegable, detectar obstáculos y calcular caminos.
+
+Clase:
+
+- `class_name GestorCuadricula`
+- hereda de `Node3D`.
+
+Variables exportadas:
+
+- `ancho: int = 100`
+  Número de columnas de la grilla.
+
+- `alto: int = 100`
+  Número de filas de la grilla.
+
+- `tamano_celda: float = 2.0`
+  Tamaño de cada celda en unidades del mundo.
+
+- `origen_mapa: Vector3 = Vector3.ZERO`
+  Punto de origen desde el cual se construye la grilla.
+
+- `altura_raycast: float = 10.0`
+  Altura desde donde se lanzan raycasts para detectar obstáculos.
+
+- `mascara_obstaculos`
+  Máscara de física usada para detectar obstáculos.
+
+Variables internas:
+
+- `grilla: Dictionary`
+  Diccionario donde la clave es una `Vector2i` y el valor es un `Nodo`.
+
+- `TOLERANCIA_LLEGADA`
+  Constante de tolerancia para llegada, aunque actualmente el movimiento usa tolerancias propias en jugador y enemigo.
+
+Métodos principales:
+
+- `_ready()`
+  Genera el mapa y luego inicializa la grilla después de un frame de física.
+
+- `generar_mapa()`
+  Crea todos los nodos. Para cada fila y columna calcula la posición 3D correspondiente y guarda un `Nodo` en `grilla`.
+
+- `inicializar_grilla()`
+  Recorre todos los nodos y lanza raycasts hacia abajo. Si el raycast golpea un nodo en el grupo `obstaculos`, marca esa celda como bloqueada.
+
+- `marcar_obstaculo(coord)`
+  Permite marcar manualmente una celda como obstáculo.
+
+- `mundo_a_grilla(pos)`
+  Convierte una posición `Vector3` del mundo a la celda correspondiente de la grilla.
+
+- `obtener_vecinos(nodo)`
+  Devuelve los vecinos transitables del nodo. Actualmente considera 8 direcciones:
+  arriba, abajo, izquierda, derecha y diagonales.
+
+- `_heuristica(a, b)`
+  Calcula distancia euclidiana entre dos nodos usando sus coordenadas de grilla.
+
+- `_insertar_ordenado(lista, nodo)`
+  Inserta un nodo en una lista ordenada por `f_cost`. Funciona como una cola de prioridad simple.
+
+- `a_estrella(inicio_pos, fin_pos)`
+  Calcula un camino con A* y devuelve un `Array[Vector3]`.
+
+- `dijkstra(inicio_pos, fin_pos)`
+  Calcula un camino con Dijkstra y devuelve un `Array[Vector3]`.
+
+- `dfs_es_alcanzable(inicio_pos, fin_pos)`
+  Verifica si existe conexión entre dos puntos usando DFS.
+
+- `dfs_camino(inicio_pos, fin_pos)`
+  Calcula un camino usando DFS y devuelve un `Array[Vector3]`.
+
+- `_reconstruir_camino(nodo_fin)`
+  Reconstruye el camino final siguiendo los padres y devuelve posiciones del mundo.
+
+- `debug_imprimir_mapa()`
+  Imprime una representación textual de la grilla, usando `X` para obstáculos y `.` para celdas libres.
+
+
+7. Algoritmos de búsqueda
+-------------------------
+
+7.1. A*
+
+Función:
+
+- `a_estrella(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]`
+
+Funcionamiento:
+
+1. Convierte las posiciones de inicio y fin a nodos de grilla.
+2. Valida que ambos nodos existan.
+3. Rechaza el destino si es obstáculo.
+4. Reinicia todos los nodos.
+5. Usa una lista abierta ordenada por `f_cost`.
+6. Revisa vecinos transitables.
+7. Calcula costo de movimiento:
+   - `1.0` para movimiento horizontal o vertical;
+   - `1.414` para movimiento diagonal.
+8. Actualiza `g_cost`, `h_cost` y `padre`.
+9. Cuando encuentra el destino, reconstruye el camino.
+
+Fórmula:
+
+- `f_cost = g_cost + h_cost`
+
+Uso actual:
+Es el algoritmo principal usado por los enemigos y el predeterminado para el movimiento por clic.
+
+
+7.2. Dijkstra
+
+Función:
+
+- `dijkstra(inicio_pos: Vector3, fin_pos: Vector3) -> Array[Vector3]`
+
+Funcionamiento:
+Dijkstra funciona de forma parecida a A*, pero no usa heurística para acercarse al destino. En el código se establece `h_cost = 0.0`.
+
+Ventaja:
+Garantiza rutas de costo mínimo sin depender de una heurística.
+
+Desventaja:
+Puede explorar más nodos que A*.
+
+Uso actual:
+Puede seleccionarse desde `ManejadorEntrada.gd` cambiando la propiedad exportada `algoritmo` a `"dijkstra"`.
+
+
+7.3. DFS
+
+Funciones:
+
+- `dfs_es_alcanzable(inicio_pos, fin_pos) -> bool`
+- `dfs_camino(inicio_pos, fin_pos) -> Array[Vector3]`
+
+Funcionamiento:
+Usa una pila para recorrer la grilla en profundidad. No calcula costos ni heurística.
+
+Ventaja:
+Es simple y útil para explicar exploración de grafos.
+
+Desventaja:
+No garantiza el camino más corto.
+
+Uso actual:
+Puede seleccionarse desde `ManejadorEntrada.gd` cambiando la propiedad exportada `algoritmo` a `"dfs"`.
+
+
+8. `MovimientoJugador.gd`
+-------------------------
+
+Propósito:
+Controlar al jugador, su movimiento, vida, combate, estados y animaciones.
+
+Clase:
+
+- `class_name MovimientoJugador`
+- hereda de `CharacterBody3D`.
+
+Variables exportadas importantes:
+
+- `animation_player`
+  Referencia al `AnimationPlayer` del jugador.
+
+- `anim_caminar`, `anim_idle`, `anim_morir`, `anim_atacar`
+  Nombres de animaciones usadas por el jugador.
+
+- `velocidad_max`
+  Velocidad máxima de movimiento.
+
+- `aceleracion` y `desaceleracion`
+  Controlan suavidad al iniciar y frenar.
+
+- `velocidad_rotacion`
+  Controla la interpolación de rotación.
+
+- `vida_max`
+  Vida máxima del jugador.
+
+- `danio_ataque`, `rango_ataque`, `intervalo_ataque`
+  Parámetros de combate.
+
+- `velocidad_anim_ataque`
+  Multiplicador de velocidad de animación al atacar.
+
+- `InterfazUsuario`
+  Referencia al HUD.
+
+Estados:
+
+- `IDLE`: quieto.
+- `MOVIENDOSE`: siguiendo camino o movimiento manual.
+- `FRENANDO`: reduciendo velocidad hasta detenerse.
+- `MUERTO`: sin control, reproduce muerte.
+- `ATACANDO`: ejecutando ataque.
+
+Movimiento manual:
+
+En `_physics_process`, el jugador revisa:
+
+- `KEY_W` o `ui_up`;
+- `KEY_S` o `ui_down`;
+- `KEY_A` o `ui_left`;
+- `KEY_D` o `ui_right`.
+
+Si hay input manual:
+
+1. Cancela `camino_actual`.
+2. Cambia a estado `MOVIENDOSE`.
+3. Calcula dirección con `Vector3(input_dir.x, 0, input_dir.y)`.
+4. Acelera con `lerp`.
+5. Rota suavemente usando `atan2`.
+6. Se mueve con `move_and_slide()`.
+
+Movimiento por camino:
+
+- `establecer_camino(nuevo_camino)`
+  Recibe un `Array` de posiciones `Vector3`, lo guarda en `camino_actual` y cambia a `MOVIENDOSE`.
+
+- `_mover(delta)`
+  Toma el primer punto del camino, calcula dirección, rota al personaje y avanza hacia ese punto. Cuando llega, elimina ese waypoint con `pop_front()`.
+
+Rotación:
+
+El código usa:
+
+- `atan2(dir.x, dir.z)` para calcular el ángulo objetivo;
+- una corrección `PI` para alinear el modelo;
+- `lerp_angle` para suavizar el giro.
+
+Combate:
+
+- `atacar()`
+  Verifica si puede atacar, detiene al jugador, cambia a `ATACANDO`, busca enemigos en el grupo `enemigos` dentro de `rango_ataque` y llama `recibir_danio()` sobre ellos.
+
+- `recibir_danio(cantidad)`
+  Resta vida, actualiza HUD y llama `_morir()` si la vida llega a cero.
+
+- `_morir()`
+  Cambia a `MUERTO`, reproduce animación de muerte, muestra derrota en el HUD y llama `celebrar_victoria()` en todos los enemigos.
+
+Animaciones:
+
+- `_transicionar(nuevo)`
+  Cambia de estado y reproduce la animación correspondiente.
+
+- `_reproducir(nombre)`
+  Evita repetir la misma animación, valida que exista y reproduce con blend. Si es ataque, usa `velocidad_anim_ataque`.
+
+
+9. `ManejadorEntrada.gd`
+------------------------
+
+Propósito:
+Convertir acciones del mouse en movimiento o ataque.
+
+Clase:
+
+- `class_name ManejadorEntrada`
+- hereda de `Node3D`.
+
+Variables exportadas:
+
+- `camara: Camera3D`
+  Cámara usada para proyectar rayos desde la pantalla.
+
+- `grid_manager: GestorCuadricula`
+  Gestor que calcula los caminos.
+
+- `jugador: MovimientoJugador`
+  Jugador que recibirá el camino o ejecutará ataque.
+
+- `mascara_suelo`
+  Capa de física usada para detectar suelo.
+
+- `distancia_rayo`
+  Longitud máxima del raycast.
+
+- `algoritmo`
+  Selector exportado con opciones `"astar"`, `"dijkstra"` y `"dfs"`.
+
+Entrada:
+
+- Clic izquierdo:
+  Llama `_procesar_clic()` y calcula una ruta al punto seleccionado.
+
+- Clic derecho:
+  Llama `jugador.atacar()` si el método existe.
+
+Proceso de clic izquierdo:
+
+1. Obtiene origen y dirección del rayo desde la cámara.
+2. Lanza un raycast hacia el mundo.
+3. Si no golpea suelo, termina.
+4. Convierte el punto golpeado a nodo con `mundo_a_grilla`.
+5. Si el destino está fuera del mapa o es obstáculo, ignora el clic.
+6. Calcula camino usando el algoritmo seleccionado.
+7. Si hay camino, llama `jugador.establecer_camino(camino)`.
+
+
+10. `InteligenciaEnemigo.gd`
+----------------------------
+
+Propósito:
+Controlar el comportamiento de los enemigos.
+
+Clase:
+
+- `class_name InteligenciaEnemigo`
+- hereda de `CharacterBody3D`.
+
+Variables exportadas:
+
+- `grid_manager`
+  Referencia al gestor de grilla.
+
+- `jugador`
+  Referencia al jugador.
+
+- `velocidad`
+  Velocidad de movimiento del enemigo.
+
+- `distancia_deteccion`
+  Distancia máxima para detectar al jugador.
+
+- `distancia_ataque`
+  Distancia a la que puede atacar.
+
+- `intervalo_recalculo`
+  Tiempo entre recálculos de ruta.
+
+- `velocidad_rotacion`
+  Suavidad del giro.
+
+- `anim_caminar`, `anim_atacar`, `anim_morir`, `anim_idle`, `anim_baile`
+  Animaciones del enemigo.
+
+- `vida_max`, `danio_ataque`, `intervalo_ataque`
+  Parámetros de vida y combate.
+
+Estados:
+
+- `PATRULLANDO`
+  El enemigo está en espera o fuera de rango.
+
+- `PERSIGUIENDO`
+  El enemigo sigue una ruta hacia el jugador.
+
+- `ATACANDO`
+  El enemigo está dentro del rango de ataque.
+
+- `MUERTO`
+  El enemigo murió.
+
+- `CELEBRANDO`
+  El enemigo celebra cuando el jugador pierde.
+
+Inicialización:
+
+En `_ready()`:
+
+1. Guarda su nombre.
+2. Inicializa vida.
+3. Se agrega al grupo `enemigos`.
+4. Crea una barra de vida con `SubViewport`, `ProgressBar` y `Sprite3D`.
+5. Busca un `AnimationPlayer` dentro de sus hijos.
+6. Configura algunas animaciones como loop.
+7. Reproduce animación idle.
+
+Persecución:
+
+En `_logica_persecucion()`:
+
+1. Si el jugador está fuera de `distancia_deteccion`, vuelve a `PATRULLANDO`.
+2. Si el jugador está dentro de `distancia_ataque`, cambia a `ATACANDO`.
+3. Si corresponde recalcular, llama `_recalcular_camino()`.
+4. Si hay camino, se mueve hacia el primer waypoint.
+
+Recálculo de camino:
+
+- `_recalcular_camino(dist)`
+  Usa `grid_manager.a_estrella(global_position, jugador.global_position)`.
+
+Movimiento:
+
+- `_mover_hacia_waypoint(delta)`
+  Avanza hacia el primer punto del camino, rota suavemente con `Basis.looking_at` y usa `move_and_slide()`.
+
+Ataque:
+
+- `_logica_ataque(delta, dist)`
+  Si el jugador se aleja, vuelve a perseguir. Si sigue cerca, mira hacia el jugador y cada `intervalo_ataque` llama `jugador.recibir_danio(danio_ataque)`.
+
+Daño y muerte:
+
+- `recibir_danio(cantidad)`
+  Resta vida, actualiza la barra y llama `morir()` si la vida llega a cero.
+
+- `morir()`
+  Cambia a `MUERTO`, reproduce animación de muerte, espera a que termine y luego elimina el nodo con `queue_free()`.
+
+Celebración:
+
+- `celebrar_victoria()`
+  Cambia a `CELEBRANDO`, detiene movimiento y reproduce `anim_baile`.
+
+
+11. `InterfazUsuario.gd`
+------------------------
+
+Propósito:
+Controlar el HUD del jugador y la pantalla de derrota.
+
+Clase:
+
+- `class_name InterfazUsuario`
+- hereda de `CanvasLayer`.
+
+Elementos:
+
+- `vida_bar`
+  Barra de vida ubicada en `$VidaBar`.
+
+Métodos:
+
+- `actualizar_vida(vida_actual, vida_max)`
+  Ajusta `max_value` y `value` de la barra.
+
+- `mostrar_derrota()`
+  Muestra un panel oscuro, un texto de derrota y un botón para volver al menú principal.
+
+- `_on_btn_volver_pressed()`
+  Cambia la escena a `res://main_menu.tscn`.
+
+
+12. `MenuPrincipal.gd`
+----------------------
+
+Propósito:
+Controlar la escena del menú principal.
+
+Variables exportadas:
+
+- `escena_juego: String = "res://mundo.tscn"`
+  Escena cargada al presionar jugar.
+
+- `escena_editor: String = "res://editor.tscn"`
+  Escena opcional del editor de niveles.
+
+Botones:
+
+- `BtnJugar`
+  Carga la escena del juego.
+
+- `BtnEditor`
+  Intenta cargar el editor si el recurso existe. Si no existe, muestra una advertencia.
+
+- `BtnSalir`
+  Cierra el juego con `get_tree().quit()`.
+
+
+13. `CamaraSeguimiento.gd`
+--------------------------
+
+Propósito:
+Mantener la cámara siguiendo al jugador.
+
+Variables exportadas:
+
+- `objetivo: Node3D`
+  Nodo seguido por la cámara.
+
+- `desplazamiento: Vector3 = Vector3(0, 20, 14)`
+  Offset relativo al objetivo.
+
+- `suavizado`
+  Controla qué tan rápido interpola la cámara hacia la posición deseada.
+
+Funcionamiento:
+
+En `_physics_process(delta)`:
+
+1. Calcula `posicion_deseada = objetivo.global_position + desplazamiento`.
+2. Interpola la posición actual con `global_position.lerp(...)`.
+3. Mira al objetivo con `look_at(...)`.
+
+
+14. Controles actuales
+----------------------
+
+- `W`, `A`, `S`, `D`: movimiento manual.
+- Flechas: movimiento manual usando acciones `ui_up`, `ui_down`, `ui_left`, `ui_right`.
+- Clic izquierdo: movimiento por ruta calculada.
+- Clic derecho: ataque del jugador.
+- Botón "Jugar": entrar a `mundo.tscn`.
+- Botón "Editor": intentar abrir `editor.tscn`.
+- Botón "Salir": cerrar el juego.
+
+
+15. Recomendaciones de mantenimiento
+------------------------------------
+
+1. Mantener nombres sincronizados
+   Si se cambia un método como `establecer_camino`, actualizar también `ManejadorEntrada.gd` y esta documentación.
+
+2. Revisar capas de física
+   Si los raycasts no detectan suelo u obstáculos, revisar las capas `suelo`, `jugador` y `obstaculos`.
+
+3. Optimizar la búsqueda
+   Para mapas grandes, conviene reemplazar la lista ordenada manual por una cola de prioridad más eficiente.
+
+4. Ajustar tamaño de celda
+   `tamano_celda` afecta precisión y rendimiento. Celdas pequeñas dan rutas más finas, pero aumentan el número de nodos.
+
+5. Evitar recalcular cada frame
+   Los enemigos ya usan `intervalo_recalculo`. Es recomendable mantener este enfoque.
+
+6. Cuidar animaciones
+   Los nombres de animaciones exportados deben coincidir con los nombres reales del `AnimationPlayer`.
+
+7. Validar grupos
+   Los obstáculos deben estar en el grupo `obstaculos` para que la grilla los detecte.
+   Los enemigos se agregan al grupo `enemigos` automáticamente.
+
+
+16. Resumen técnico
+-------------------
+
+El proyecto usa una grilla de `Nodo` para representar el terreno jugable. Sobre esa grilla se aplican A*, Dijkstra o DFS para generar caminos como listas de posiciones `Vector3`. El jugador puede seguir esas rutas o moverse directamente con teclado. Los enemigos usan A* para perseguir al jugador, atacan al estar cerca y tienen barras de vida individuales. El HUD muestra la vida del jugador y una pantalla de derrota cuando muere.
+
+Esta documentación describe el estado actual del proyecto y debe actualizarse cuando cambien los scripts, escenas principales, controles o nombres de métodos.
